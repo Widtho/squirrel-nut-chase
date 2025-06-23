@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Squirrel Nut Chase</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
 </head>
@@ -12,20 +13,20 @@ let bunny;
 let nuts = [];
 let score = 0;
 let gameOver = false;
-let buttons = [];
+let joystick;
+let canvasSize;
 
 function setup() {
-  createCanvas(600, 400);
+  // Set canvas size to fit screen, maintaining aspect ratio
+  canvasSize = min(windowWidth, windowHeight * 1.5) * 0.9;
+  createCanvas(canvasSize, canvasSize * 0.667); // Maintain 3:2 aspect ratio
   squirrel = new Squirrel();
   bunny = new Bunny();
   for (let i = 0; i < 5; i++) {
     nuts.push(new Nut());
   }
-  // Initialize touch buttons (Up, Left, Down, Right)
-  buttons.push(new Button(50, 350, 50, 50, 'Up'));    // Up button
-  buttons.push(new Button(50, 400, 50, 50, 'Left'));  // Left button
-  buttons.push(new Button(100, 400, 50, 50, 'Down')); // Down button
-  buttons.push(new Button(150, 400, 50, 50, 'Right')); // Right button
+  // Initialize joystick
+  joystick = new Joystick(canvasSize * 0.15, canvasSize * 0.55, canvasSize * 0.1);
 }
 
 function draw() {
@@ -49,23 +50,30 @@ function draw() {
       gameOver = true;
     }
     // Display score
-    textSize(20);
+    textSize(canvasSize * 0.05);
     fill(0);
-    text(`Score: ${score}`, 10, 30);
-    // Draw touch buttons
-    for (let button of buttons) {
-      button.show();
-    }
+    text(`Score: ${score}`, canvasSize * 0.02, canvasSize * 0.075);
+    // Draw joystick
+    joystick.show();
   } else {
     // Game over screen
-    textSize(32);
+    textSize(canvasSize * 0.08);
     fill(255, 0, 0);
     textAlign(CENTER);
     text('Game Over!', width / 2, height / 2);
-    text(`Final Score: ${score}`, width / 2, height / 2 + 40);
-    textSize(20);
-    text('Press R or Tap to Restart', width / 2, height / 2 + 80);
+    text(`Final Score: ${score}`, width / 2, height / 2 + canvasSize * 0.1);
+    textSize(canvasSize * 0.05);
+    text('Press R or Tap to Restart', width / 2, height / 2 + canvasSize * 0.2);
   }
+}
+
+function windowResized() {
+  // Resize canvas when window size changes
+  canvasSize = min(windowWidth, windowHeight * 1.5) * 0.9;
+  resizeCanvas(canvasSize, canvasSize * 0.667);
+  joystick.x = canvasSize * 0.15;
+  joystick.y = canvasSize * 0.55;
+  joystick.radius = canvasSize * 0.1;
 }
 
 function keyPressed() {
@@ -75,10 +83,8 @@ function keyPressed() {
 }
 
 function touchStarted() {
-  // Check if touch is on a button
-  for (let button of buttons) {
-    button.checkTouch(touches);
-  }
+  // Handle joystick touch
+  joystick.checkTouch(touches);
   // Restart game if game over and screen is tapped
   if (gameOver) {
     restartGame();
@@ -86,11 +92,15 @@ function touchStarted() {
   return false; // Prevent default touch behavior
 }
 
+function touchMoved() {
+  // Update joystick position during drag
+  joystick.checkTouch(touches);
+  return false;
+}
+
 function touchEnded() {
-  // Reset button states when touch ends
-  for (let button of buttons) {
-    button.isPressed = false;
-  }
+  // Reset joystick when touch ends
+  joystick.reset();
   return false;
 }
 
@@ -107,13 +117,13 @@ function restartGame() {
 
 class Squirrel {
   constructor() {
-    this.x = 50;
+    this.x = canvasSize * 0.083; // Scaled to canvas
     this.y = height / 2;
     this.vx = 0;
     this.vy = 0;
-    this.speed = 4;
-    this.width = 40;
-    this.height = 40;
+    this.speed = canvasSize * 0.0067; // Scaled speed
+    this.width = canvasSize * 0.067; // Scaled size
+    this.height = canvasSize * 0.067;
   }
 
   show() {
@@ -129,28 +139,20 @@ class Squirrel {
       this.vy = -this.speed;
     } else if (keyIsDown(83)) { // S key (down)
       this.vy = this.speed;
-    } else if (!buttons.find(b => b.label === 'Up' && b.isPressed) && !buttons.find(b => b.label === 'Down' && b.isPressed)) {
+    } else if (!joystick.isActive || (joystick.dx === 0 && joystick.dy === 0)) {
       this.vy = 0;
     }
     if (keyIsDown(65)) { // A key (left)
       this.vx = -this.speed;
     } else if (keyIsDown(68)) { // D key (right)
       this.vx = this.speed;
-    } else if (!buttons.find(b => b.label === 'Left' && b.isPressed) && !buttons.find(b => b.label === 'Right' && b.isPressed)) {
+    } else if (!joystick.isActive || (joystick.dx === 0 && joystick.dy === 0)) {
       this.vx = 0;
     }
-    // Handle touch buttons
-    if (buttons.find(b => b.label === 'Up' && b.isPressed)) {
-      this.vy = -this.speed;
-    }
-    if (buttons.find(b => b.label === 'Down' && b.isPressed)) {
-      this.vy = this.speed;
-    }
-    if (buttons.find(b => b.label === 'Left' && b.isPressed)) {
-      this.vx = -this.speed;
-    }
-    if (buttons.find(b => b.label === 'Right' && b.isPressed)) {
-      this.vx = this.speed;
+    // Handle joystick input
+    if (joystick.isActive) {
+      this.vx = joystick.dx * this.speed;
+      this.vy = joystick.dy * this.speed;
     }
     // Keep squirrel within canvas bounds
     this.x = constrain(this.x, this.width / 2, width - this.width / 2);
@@ -165,19 +167,19 @@ class Squirrel {
 
 class Bunny {
   constructor() {
-    this.x = width - 50;
+    this.x = width - canvasSize * 0.083;
     this.y = height / 2;
-    this.speed = 2;
-    this.width = 40;
-    this.height = 40;
+    this.speed = canvasSize * 0.0033; // Scaled speed
+    this.width = canvasSize * 0.067;
+    this.height = canvasSize * 0.067;
   }
 
   show() {
     fill(255, 255, 255); // White for bunny
     ellipse(this.x, this.y, this.width, this.height);
     fill(255, 0, 0); // Red eyes
-    ellipse(this.x - 8, this.y - 5, 5, 5);
-    ellipse(this.x + 8, this.y - 5, 5, 5);
+    ellipse(this.x - this.width * 0.2, this.y - this.height * 0.125, this.width * 0.125, this.height * 0.125);
+    ellipse(this.x + this.width * 0.2, this.y - this.height * 0.125, this.width * 0.125, this.height * 0.125);
   }
 
   move(targetX, targetY) {
@@ -193,10 +195,10 @@ class Bunny {
 
 class Nut {
   constructor() {
-    this.x = random(width, width + 100);
-    this.y = random(50, height - 50);
-    this.width = 15;
-    this.speed = -3;
+    this.x = random(width, width + canvasSize * 0.167);
+    this.y = random(canvasSize * 0.083, height - canvasSize * 0.083);
+    this.width = canvasSize * 0.025;
+    this.speed = -canvasSize * 0.005;
   }
 
   show() {
@@ -204,39 +206,64 @@ class Nut {
     ellipse(this.x, this.y, this.width, this.width);
     this.x += this.speed;
     if (this.x < -this.width) {
-      this.x = random(width, width + 100);
-      this.y = random(50, height - 50);
+      this.x = random(width, width + canvasSize * 0.167);
+      this.y = random(canvasSize * 0.083, height - canvasSize * 0.083);
     }
   }
 }
 
-class Button {
-  constructor(x, y, w, h, label) {
+class Joystick {
+  constructor(x, y, radius) {
     this.x = x;
     this.y = y;
-    this.w = w;
-    this.h = h;
-    this.label = label;
-    this.isPressed = false;
+    this.radius = radius;
+    this.innerRadius = radius * 0.4;
+    this.dx = 0;
+    this.dy = 0;
+    this.isActive = false;
+    this.touchX = x;
+    this.touchY = y;
   }
 
   show() {
+    // Draw outer circle
     fill(100, 100, 100, 150); // Semi-transparent gray
-    rect(this.x, this.y, this.w, this.h, 10);
-    fill(255);
-    textAlign(CENTER, CENTER);
-    textSize(16);
-    text(this.label[0], this.x + this.w / 2, this.y + this.h / 2);
+    ellipse(this.x, this.y, this.radius * 2);
+    // Draw inner circle
+    fill(200, 200, 200, 200);
+    ellipse(this.touchX, this.touchY, this.innerRadius * 2);
   }
 
   checkTouch(touches) {
+    this.isActive = false;
     for (let touch of touches) {
-      if (touch.x > this.x && touch.x < this.x + this.w && touch.y > this.y && touch.y < this.y + this.h) {
-        this.isPressed = true;
+      let d = dist(touch.x, touch.y, this.x, this.y);
+      if (d < this.radius) {
+        this.isActive = true;
+        // Calculate direction vector
+        this.dx = (touch.x - this.x) / this.radius;
+        this.dy = (touch.y - this.y) / this.radius;
+        // Limit to unit vector
+        let mag = sqrt(this.dx * this.dx + this.dy * this.dy);
+        if (mag > 1) {
+          this.dx /= mag;
+          this.dy /= mag;
+        }
+        // Update inner circle position
+        this.touchX = this.x + this.dx * this.radius;
+        this.touchY = this.y + this.dy * this.radius;
         return;
       }
     }
-    this.isPressed = false;
+    this.reset();
+  }
+
+  reset() {
+    this.dx = 0;
+    this.dy = 0;
+    this.isActive = false;
+    this.touchX = this.x;
+    this.touchY = this.y;
   }
 }
 </script>
