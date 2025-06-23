@@ -12,6 +12,7 @@ let bunny;
 let nuts = [];
 let score = 0;
 let gameOver = false;
+let buttons = [];
 
 function setup() {
   createCanvas(600, 400);
@@ -20,15 +21,21 @@ function setup() {
   for (let i = 0; i < 5; i++) {
     nuts.push(new Nut());
   }
+  // Initialize touch buttons (Up, Left, Down, Right)
+  buttons.push(new Button(50, 350, 50, 50, 'Up'));    // Up button
+  buttons.push(new Button(50, 400, 50, 50, 'Left'));  // Left button
+  buttons.push(new Button(100, 400, 50, 50, 'Down')); // Down button
+  buttons.push(new Button(150, 400, 50, 50, 'Right')); // Right button
 }
 
 function draw() {
-  background(200, 220, 200);
+  background(200, 220, 200); // Light green background
   if (!gameOver) {
     squirrel.show();
     squirrel.move();
     bunny.show();
     bunny.move(squirrel.x, squirrel.y);
+    // Handle nuts
     for (let i = nuts.length - 1; i >= 0; i--) {
       nuts[i].show();
       if (squirrel.hits(nuts[i])) {
@@ -37,33 +44,64 @@ function draw() {
         nuts.push(new Nut());
       }
     }
+    // Check for bunny catching squirrel
     if (squirrel.hits(bunny)) {
       gameOver = true;
     }
+    // Display score
     textSize(20);
     fill(0);
     text(`Score: ${score}`, 10, 30);
+    // Draw touch buttons
+    for (let button of buttons) {
+      button.show();
+    }
   } else {
+    // Game over screen
     textSize(32);
     fill(255, 0, 0);
     textAlign(CENTER);
     text('Game Over!', width / 2, height / 2);
     text(`Final Score: ${score}`, width / 2, height / 2 + 40);
     textSize(20);
-    text('Press R to Restart', width / 2, height / 2 + 80);
+    text('Press R or Tap to Restart', width / 2, height / 2 + 80);
   }
 }
 
 function keyPressed() {
   if (key === 'r' || key === 'R') {
-    score = 0;
-    gameOver = false;
-    nuts = [];
-    squirrel = new Squirrel();
-    bunny = new Bunny();
-    for (let i = 0; i < 5; i++) {
-      nuts.push(new Nut());
-    }
+    restartGame();
+  }
+}
+
+function touchStarted() {
+  // Check if touch is on a button
+  for (let button of buttons) {
+    button.checkTouch(touches);
+  }
+  // Restart game if game over and screen is tapped
+  if (gameOver) {
+    restartGame();
+  }
+  return false; // Prevent default touch behavior
+}
+
+function touchEnded() {
+  // Reset button states when touch ends
+  for (let button of buttons) {
+    button.isPressed = false;
+  }
+  return false;
+}
+
+function restartGame() {
+  score = 0;
+  gameOver = false;
+  nuts = [];
+  squirrel = new Squirrel();
+  bunny = new Bunny();
+  for (let i = 0; i < 5; i++) {
+    nuts.push(new Nut());
   }
 }
 
@@ -77,30 +115,48 @@ class Squirrel {
     this.width = 40;
     this.height = 40;
   }
+
   show() {
-    fill(139, 69, 19);
+    fill(139, 69, 19); // Brown for squirrel
     ellipse(this.x, this.y, this.width, this.height);
   }
+
   move() {
     this.x += this.vx;
     this.y += this.vy;
-    if (keyIsDown(87)) {
+    // Handle WASD controls
+    if (keyIsDown(87)) { // W key (up)
       this.vy = -this.speed;
-    } else if (keyIsDown(83)) {
+    } else if (keyIsDown(83)) { // S key (down)
       this.vy = this.speed;
-    } else {
+    } else if (!buttons.find(b => b.label === 'Up' && b.isPressed) && !buttons.find(b => b.label === 'Down' && b.isPressed)) {
       this.vy = 0;
     }
-    if (keyIsDown(65)) {
+    if (keyIsDown(65)) { // A key (left)
       this.vx = -this.speed;
-    } else if (keyIsDown(68)) {
+    } else if (keyIsDown(68)) { // D key (right)
       this.vx = this.speed;
-    } else {
+    } else if (!buttons.find(b => b.label === 'Left' && b.isPressed) && !buttons.find(b => b.label === 'Right' && b.isPressed)) {
       this.vx = 0;
     }
+    // Handle touch buttons
+    if (buttons.find(b => b.label === 'Up' && b.isPressed)) {
+      this.vy = -this.speed;
+    }
+    if (buttons.find(b => b.label === 'Down' && b.isPressed)) {
+      this.vy = this.speed;
+    }
+    if (buttons.find(b => b.label === 'Left' && b.isPressed)) {
+      this.vx = -this.speed;
+    }
+    if (buttons.find(b => b.label === 'Right' && b.isPressed)) {
+      this.vx = this.speed;
+    }
+    // Keep squirrel within canvas bounds
     this.x = constrain(this.x, this.width / 2, width - this.width / 2);
     this.y = constrain(this.y, this.height / 2, height - this.height / 2);
   }
+
   hits(object) {
     let d = dist(this.x, this.y, object.x, object.y);
     return d < this.width / 2 + object.width / 2;
@@ -115,13 +171,15 @@ class Bunny {
     this.width = 40;
     this.height = 40;
   }
+
   show() {
-    fill(255, 255, 255);
+    fill(255, 255, 255); // White for bunny
     ellipse(this.x, this.y, this.width, this.height);
-    fill(255, 0, 0);
+    fill(255, 0, 0); // Red eyes
     ellipse(this.x - 8, this.y - 5, 5, 5);
     ellipse(this.x + 8, this.y - 5, 5, 5);
   }
+
   move(targetX, targetY) {
     let dx = targetX - this.x;
     let dy = targetY - this.y;
@@ -140,8 +198,9 @@ class Nut {
     this.width = 15;
     this.speed = -3;
   }
+
   show() {
-    fill(210, 105, 30);
+    fill(210, 105, 30); // Nut color
     ellipse(this.x, this.y, this.width, this.width);
     this.x += this.speed;
     if (this.x < -this.width) {
@@ -150,6 +209,37 @@ class Nut {
     }
   }
 }
+
+class Button {
+  constructor(x, y, w, h, label) {
+    this.x = x;
+    this.y = y;
+    this.w = w;
+    this.h = h;
+    this.label = label;
+    this.isPressed = false;
+  }
+
+  show() {
+    fill(100, 100, 100, 150); // Semi-transparent gray
+    rect(this.x, this.y, this.w, this.h, 10);
+    fill(255);
+    textAlign(CENTER, CENTER);
+    textSize(16);
+    text(this.label[0], this.x + this.w / 2, this.y + this.h / 2);
+  }
+
+  checkTouch(touches) {
+    for (let touch of touches) {
+      if (touch.x > this.x && touch.x < this.x + this.w && touch.y > this.y && touch.y < this.y + this.h) {
+        this.isPressed = true;
+        return;
+      }
+    }
+    this.isPressed = false;
+  }
+}
 </script>
 </body>
 </html>
+
