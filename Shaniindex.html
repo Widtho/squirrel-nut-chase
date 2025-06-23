@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Squirrel Nut Chase</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
+</head>
+<body>
+<script>
+let squirrel;
+let bunny;
+let nuts = [];
+let score = 0;
+let gameOver = false;
+
+function setup() {
+  createCanvas(600, 400);
+  squirrel = new Squirrel();
+  bunny = new Bunny();
+  for (let i = 0; i < 5; i++) {
+    nuts.push(new Nut());
+  }
+}
+
+function draw() {
+  background(200, 220, 200);
+  if (!gameOver) {
+    squirrel.show();
+    squirrel.move();
+    bunny.show();
+    bunny.move(squirrel.x, squirrel.y);
+    for (let i = nuts.length - 1; i >= 0; i--) {
+      nuts[i].show();
+      if (squirrel.hits(nuts[i])) {
+        score += 1;
+        nuts.splice(i, 1);
+        nuts.push(new Nut());
+      }
+    }
+    if (squirrel.hits(bunny)) {
+      gameOver = true;
+    }
+    textSize(20);
+    fill(0);
+    text(`Score: ${score}`, 10, 30);
+  } else {
+    textSize(32);
+    fill(255, 0, 0);
+    textAlign(CENTER);
+    text('Game Over!', width / 2, height / 2);
+    text(`Final Score: ${score}`, width / 2, height / 2 + 40);
+    textSize(20);
+    text('Press R to Restart', width / 2, height / 2 + 80);
+  }
+}
+
+function keyPressed() {
+  if (key === 'r' || key === 'R') {
+    score = 0;
+    gameOver = false;
+    nuts = [];
+    squirrel = new Squirrel();
+    bunny = new Bunny();
+    for (let i = 0; i < 5; i++) {
+      nuts.push(new Nut());
+    }
+  }
+}
+
+class Squirrel {
+  constructor() {
+    this.x = 50;
+    this.y = height / 2;
+    this.vx = 0;
+    this.vy = 0;
+    this.speed = 4;
+    this.width = 40;
+    this.height = 40;
+  }
+  show() {
+    fill(139, 69, 19);
+    ellipse(this.x, this.y, this.width, this.height);
+  }
+  move() {
+    this.x += this.vx;
+    this.y += this.vy;
+    if (keyIsDown(87)) {
+      this.vy = -this.speed;
+    } else if (keyIsDown(83)) {
+      this.vy = this.speed;
+    } else {
+      this.vy = 0;
+    }
+    if (keyIsDown(65)) {
+      this.vx = -this.speed;
+    } else if (keyIsDown(68)) {
+      this.vx = this.speed;
+    } else {
+      this.vx = 0;
+    }
+    this.x = constrain(this.x, this.width / 2, width - this.width / 2);
+    this.y = constrain(this.y, this.height / 2, height - this.height / 2);
+  }
+  hits(object) {
+    let d = dist(this.x, this.y, object.x, object.y);
+    return d < this.width / 2 + object.width / 2;
+  }
+}
+
+class Bunny {
+  constructor() {
+    this.x = width - 50;
+    this.y = height / 2;
+    this.speed = 2;
+    this.width = 40;
+    this.height = 40;
+  }
+  show() {
+    fill(255, 255, 255);
+    ellipse(this.x, this.y, this.width, this.height);
+    fill(255, 0, 0);
+    ellipse(this.x - 8, this.y - 5, 5, 5);
+    ellipse(this.x + 8, this.y - 5, 5, 5);
+  }
+  move(targetX, targetY) {
+    let dx = targetX - this.x;
+    let dy = targetY - this.y;
+    let distance = sqrt(dx * dx + dy * dy);
+    if (distance > 0) {
+      this.x += (dx / distance) * this.speed;
+      this.y += (dy / distance) * this.speed;
+    }
+  }
+}
+
+class Nut {
+  constructor() {
+    this.x = random(width, width + 100);
+    this.y = random(50, height - 50);
+    this.width = 15;
+    this.speed = -3;
+  }
+  show() {
+    fill(210, 105, 30);
+    ellipse(this.x, this.y, this.width, this.width);
+    this.x += this.speed;
+    if (this.x < -this.width) {
+      this.x = random(width, width + 100);
+      this.y = random(50, height - 50);
+    }
+  }
+}
+</script>
+</body>
+</html>
