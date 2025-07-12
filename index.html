@@ -235,27 +235,23 @@ class Joystick {
   }
 
   checkTouch(touches) {
-    this.isActive = false;
-    for (let touch of touches) {
+    if (touches.length > 0) {
+      let touch = touches[0]; // Assume first touch for joystick
       let d = dist(touch.x, touch.y, this.x, this.y);
-      if (d < this.radius) {
+      if (this.isActive || d < this.radius) {
         this.isActive = true;
-        // Calculate direction vector
         this.dx = (touch.x - this.x) / this.radius;
         this.dy = (touch.y - this.y) / this.radius;
-        // Limit to unit vector
         let mag = sqrt(this.dx * this.dx + this.dy * this.dy);
         if (mag > 1) {
           this.dx /= mag;
           this.dy /= mag;
         }
-        // Update inner circle position
         this.touchX = this.x + this.dx * this.radius;
         this.touchY = this.y + this.dy * this.radius;
         return;
       }
     }
-    this.reset();
   }
 
   reset() {
