@@ -15,23 +15,49 @@ let score = 0;
 let gameOver = false;
 let joystick;
 let canvasSize;
+let totalRegularSpawned = 0;
+let playerName;
+let highScore = 0;
+let gameState = 'start'; // 'start', 'playing', 'over'
+let startTime;
 
 function setup() {
+  // Get player name and high score from localStorage
+  playerName = localStorage.getItem('playerName');
+  if (!playerName) {
+    playerName = prompt('Enter your name:') || 'Player';
+    localStorage.setItem('playerName', playerName);
+  }
+  highScore = parseInt(localStorage.getItem('highScore')) || 0;
+
   // Set canvas size to fit screen, maintaining aspect ratio
   canvasSize = min(windowWidth, windowHeight * 1.5) * 0.9;
   createCanvas(canvasSize, canvasSize * 0.667); // Maintain 3:2 aspect ratio
   squirrel = new Squirrel();
   bunny = new Bunny();
   for (let i = 0; i < 5; i++) {
-    nuts.push(new Nut());
+    nuts.push(new Nut(false));
+    totalRegularSpawned++;
   }
   // Initialize joystick
   joystick = new Joystick(canvasSize * 0.15, canvasSize * 0.55, canvasSize * 0.1);
+  startTime = millis();
 }
 
 function draw() {
   background(200, 220, 200); // Light green background
-  if (!gameOver) {
+  if (gameState === 'start') {
+    let countdown = 5 - floor((millis() - startTime) / 1000);
+    textAlign(CENTER);
+    textSize(canvasSize * 0.1);
+    fill(0);
+    text('Get Ready!', width / 2, height / 2 - canvasSize * 0.05);
+    textSize(canvasSize * 0.2);
+    text(countdown, width / 2, height / 2 + canvasSize * 0.1);
+    if (countdown <= 0) {
+      gameState = 'playing';
+    }
+  } else if (gameState === 'playing') {
     squirrel.show();
     squirrel.move();
     bunny.show();
@@ -41,21 +67,37 @@ function draw() {
       nuts[i].show();
       if (squirrel.hits(nuts[i])) {
         score += 1;
+        if (nuts[i].isGolden) {
+          squirrel.tempBoostTime = millis() + 6000;
+        } else {
+          squirrel.speed += squirrel.incrementSpeed;
+        }
         nuts.splice(i, 1);
-        nuts.push(new Nut());
+        // Push new nut
+        if (totalRegularSpawned % 40 === 0 && totalRegularSpawned > 0) {
+          nuts.push(new Nut(true)); // Golden nut
+        } else {
+          nuts.push(new Nut(false)); // Regular nut
+          totalRegularSpawned++;
+        }
       }
     }
     // Check for bunny catching squirrel
     if (squirrel.hits(bunny)) {
       gameOver = true;
+      gameState = 'over';
     }
     // Display score
     textSize(canvasSize * 0.05);
     fill(0);
+    textAlign(LEFT);
     text(`Score: ${score}`, canvasSize * 0.02, canvasSize * 0.075);
+    // Display player name and high score
+    textAlign(RIGHT);
+    text(`${playerName} High: ${highScore}`, width - canvasSize * 0.02, canvasSize * 0.075);
     // Draw joystick
     joystick.show();
-  } else {
+  } else if (gameState === 'over') {
     // Game over screen
     textSize(canvasSize * 0.08);
     fill(255, 0, 0);
@@ -78,7 +120,9 @@ function windowResized() {
 
 function keyPressed() {
   if (key === 'r' || key === 'R') {
-    restartGame();
+    if (gameState === 'over') {
+      restartGame();
+    }
   }
 }
 
@@ -86,7 +130,7 @@ function touchStarted() {
   // Handle joystick touch
   joystick.checkTouch(touches);
   // Restart game if game over and screen is tapped
-  if (gameOver) {
+  if (gameState === 'over') {
     restartGame();
   }
   return false; // Prevent default touch behavior
@@ -105,14 +149,22 @@ function touchEnded() {
 }
 
 function restartGame() {
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem('highScore', highScore);
+  }
   score = 0;
   gameOver = false;
   nuts = [];
   squirrel = new Squirrel();
   bunny = new Bunny();
+  totalRegularSpawned = 0;
   for (let i = 0; i < 5; i++) {
-    nuts.push(new Nut());
+    nuts.push(new Nut(false));
+    totalRegularSpawned++;
   }
+  gameState = 'start';
+  startTime = millis();
 }
 
 class Squirrel {
@@ -121,39 +173,67 @@ class Squirrel {
     this.y = height / 2;
     this.vx = 0;
     this.vy = 0;
-    this.speed = canvasSize * 0.0067; // Scaled speed
+    this.baseSpeed = canvasSize * 0.005; // Initial speed, same as bunny
+    this.speed = this.baseSpeed;
+    this.incrementSpeed = canvasSize * 0.0003; // Less than bunny's increment
+    this.tempBoostTime = 0;
     this.width = canvasSize * 0.067; // Scaled size
     this.height = canvasSize * 0.067;
   }
 
   show() {
-    fill(139, 69, 19); // Brown for squirrel
-    ellipse(this.x, this.y, this.width, this.height);
+    push();
+    translate(this.x, this.y);
+    // Body
+    fill(139, 69, 19); // Brown
+    ellipse(0, 0, this.width * 0.8, this.height * 0.6);
+    // Head
+    ellipse(-this.width * 0.3, -this.height * 0.2, this.width * 0.4, this.height * 0.4);
+    // Ears
+    triangle(-this.width * 0.4, -this.height * 0.3, -this.width * 0.35, -this.height * 0.4, -this.width * 0.3, -this.height * 0.3);
+    triangle(-this.width * 0.2, -this.height * 0.3, -this.width * 0.25, -this.height * 0.4, -this.width * 0.15, -this.height * 0.3);
+    // Tail
+    noFill();
+    stroke(139, 69, 19);
+    strokeWeight(this.width * 0.1);
+    arc(this.width * 0.3, 0, this.width * 0.6, this.height * 0.6, PI / 2, 3 * PI / 2);
+    noStroke();
+    pop();
   }
 
   move() {
-    this.x += this.vx;
-    this.y += this.vy;
+    let currentSpeed = this.speed;
+    if (millis() < this.tempBoostTime) {
+      currentSpeed *= 2;
+    }
     // Handle WASD controls
+    this.vx = 0;
+    this.vy = 0;
     if (keyIsDown(87)) { // W key (up)
-      this.vy = -this.speed;
-    } else if (keyIsDown(83)) { // S key (down)
-      this.vy = this.speed;
-    } else if (!joystick.isActive || (joystick.dx === 0 && joystick.dy === 0)) {
-      this.vy = 0;
+      this.vy = -currentSpeed;
+    }
+    if (keyIsDown(83)) { // S key (down)
+      this.vy = currentSpeed;
     }
     if (keyIsDown(65)) { // A key (left)
-      this.vx = -this.speed;
-    } else if (keyIsDown(68)) { // D key (right)
-      this.vx = this.speed;
-    } else if (!joystick.isActive || (joystick.dx === 0 && joystick.dy === 0)) {
-      this.vx = 0;
+      this.vx = -currentSpeed;
     }
-    // Handle joystick input
+    if (keyIsDown(68)) { // D key (right)
+      this.vx = currentSpeed;
+    }
+    // Normalize for diagonal movement (keys)
+    if (this.vx !== 0 && this.vy !== 0) {
+      let mag = sqrt(this.vx * this.vx + this.vy * this.vy);
+      this.vx = (this.vx / mag) * currentSpeed;
+      this.vy = (this.vy / mag) * currentSpeed;
+    }
+    // Handle joystick input (overrides keys if active)
     if (joystick.isActive) {
-      this.vx = joystick.dx * this.speed;
-      this.vy = joystick.dy * this.speed;
+      this.vx = joystick.dx * currentSpeed;
+      this.vy = joystick.dy * currentSpeed;
     }
+    this.x += this.vx;
+    this.y += this.vy;
     // Keep squirrel within canvas bounds
     this.x = constrain(this.x, this.width / 2, width - this.width / 2);
     this.y = constrain(this.y, this.height / 2, height - this.height / 2);
@@ -169,17 +249,30 @@ class Bunny {
   constructor() {
     this.x = width - canvasSize * 0.083;
     this.y = height / 2;
-    this.speed = canvasSize * 0.0033; // Scaled speed
+    this.speed = canvasSize * 0.004; // Reduced initial speed
+    this.incrementSpeed = canvasSize * 0.00005; // Very small increment
     this.width = canvasSize * 0.067;
     this.height = canvasSize * 0.067;
   }
 
   show() {
-    fill(255, 255, 255); // White for bunny
-    ellipse(this.x, this.y, this.width, this.height);
-    fill(255, 0, 0); // Red eyes
-    ellipse(this.x - this.width * 0.2, this.y - this.height * 0.125, this.width * 0.125, this.height * 0.125);
-    ellipse(this.x + this.width * 0.2, this.y - this.height * 0.125, this.width * 0.125, this.height * 0.125);
+    push();
+    translate(this.x, this.y);
+    // Body
+    fill(255, 255, 255); // White
+    ellipse(0, 0, this.width * 0.8, this.height * 0.6);
+    // Head
+    ellipse(-this.width * 0.3, -this.height * 0.2, this.width * 0.4, this.height * 0.4);
+    // Ears
+    ellipse(-this.width * 0.35, -this.height * 0.5, this.width * 0.1, this.height * 0.4);
+    ellipse(-this.width * 0.25, -this.height * 0.5, this.width * 0.1, this.height * 0.4);
+    // Tail
+    ellipse(this.width * 0.3, 0, this.width * 0.2, this.height * 0.2);
+    // Eyes
+    fill(255, 0, 0); // Red
+    ellipse(-this.width * 0.35, -this.height * 0.2, this.width * 0.05, this.height * 0.05);
+    ellipse(-this.width * 0.25, -this.height * 0.2, this.width * 0.05, this.height * 0.05);
+    pop();
   }
 
   move(targetX, targetY) {
@@ -194,20 +287,37 @@ class Bunny {
 }
 
 class Nut {
-  constructor() {
+  constructor(isGolden = false) {
     this.x = random(width, width + canvasSize * 0.167);
     this.y = random(canvasSize * 0.083, height - canvasSize * 0.083);
     this.width = canvasSize * 0.025;
     this.speed = -canvasSize * 0.005;
+    this.isGolden = isGolden;
   }
 
   show() {
-    fill(210, 105, 30); // Nut color
-    ellipse(this.x, this.y, this.width, this.width);
+    push();
+    translate(this.x, this.y);
+    if (this.isGolden) {
+      fill(255, 215, 0); // Gold body
+    } else {
+      fill(210, 105, 30); // Brown body
+    }
+    ellipse(0, 0, this.width, this.width * 1.5); // Elongated body
+    if (this.isGolden) {
+      fill(255, 165, 0); // Orange cap for golden
+    } else {
+      fill(165, 42, 42); // Dark brown cap
+    }
+    rect(-this.width / 2, -this.width * 0.75, this.width, this.width * 0.5); // Cap
+    pop();
     this.x += this.speed;
     if (this.x < -this.width) {
+      bunny.speed += bunny.incrementSpeed;
       this.x = random(width, width + canvasSize * 0.167);
       this.y = random(canvasSize * 0.083, height - canvasSize * 0.083);
+      this.isGolden = false; // Reset to regular if golden missed
+      totalRegularSpawned++;
     }
   }
 }
@@ -265,4 +375,3 @@ class Joystick {
 </script>
 </body>
 </html>
-
